@@ -1,0 +1,67 @@
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+
+model User {
+  id              String    @id @default(uuid())
+  email           String    @unique
+  name            String?
+  password        String    @map("password_hash")
+  role            ROLE
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  createdRequests Request[]
+  approvals       Approval[]
+
+  @@map("users")
+}
+
+enum ROLE {
+  CREATOR
+  APPROVER
+}
+
+model Request {
+  id          String         @id @default(uuid())
+  title       String
+  description String?
+  status      RequestStatus  @default(PENDING)
+  createdById String         @map("created_by_id")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+  creator     User           @relation(fields: [createdById], references: [id])
+  approvals   Approval[]
+
+  @@map("requests")
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Approval {
+  id         String           @id @default(uuid())
+  requestId  String           @map("request_id")
+  approverId String           @map("approver_id")
+  decision   ApprovalDecision
+  note       String?
+  approvedAt DateTime         @default(now()) @map("approved_at")
+  request    Request         @relation(fields: [requestId], references: [id])
+  approver   User            @relation(fields: [approverId], references: [id])
+
+  @@map("approvals")
+}
+
+enum ApprovalDecision {
+  APPROVED
+  REJECTED
+}
