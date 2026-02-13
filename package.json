@@ -17,7 +17,10 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "db:seed": "prisma db seed",
+    "db:reset": "prisma migrate reset",
+    "docs:generate": "ts-node -r tsconfig-paths/register scripts/generate-swagger.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -25,6 +28,7 @@
     "@nestjs/jwt": "^11.0.0",
     "@nestjs/passport": "^11.0.0",
     "@nestjs/platform-express": "^11.0.1",
+    "@nestjs/swagger": "^11.2.6",
     "@prisma/adapter-mariadb": "^7.4.0",
     "@prisma/client": "^7.3.0",
     "bcryptjs": "^3.0.3",
@@ -47,6 +51,7 @@
     "@types/bcryptjs": "^3.0.0",
     "@types/express": "^5.0.0",
     "@types/jest": "^30.0.0",
+    "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.10.7",
     "@types/passport-jwt": "^4.0.1",
     "@types/supertest": "^6.0.2",
@@ -55,6 +60,7 @@
     "eslint-plugin-prettier": "^5.2.2",
     "globals": "^16.0.0",
     "jest": "^30.0.0",
+    "js-yaml": "^4.1.1",
     "prettier": "^3.4.2",
     "prisma": "^7.4.0",
     "source-map-support": "^0.5.21",

@@ -11,6 +11,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -22,6 +23,8 @@ import { RequestsService } from './requests.service';
 
 type JwtUser = { sub: string; email: string; role: string };
 
+@ApiTags('Permintaan')
+@ApiBearerAuth('JWT')
 @Controller('requests')
 @UseGuards(JwtAuthGuard)
 export class RequestsController {
@@ -31,6 +34,12 @@ export class RequestsController {
   @UseGuards(RolesGuard)
   @Roles(['CREATOR'])
   @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Buat permintaan', description: 'Hanya role CREATOR. Membuat permintaan baru dengan status PENDING.' })
+  @ApiBody({ type: CreateRequestDto })
+  @ApiResponse({ status: 201, description: 'Permintaan berhasil dibuat.' })
+  @ApiResponse({ status: 400, description: 'Validasi gagal (judul kosong, dll).' })
+  @ApiResponse({ status: 401, description: 'Token tidak valid.' })
+  @ApiResponse({ status: 403, description: 'Hanya CREATOR yang boleh membuat permintaan.' })
   async create(
     @Req() req: Request & { user: JwtUser },
     @Body() body: CreateRequestDto,
@@ -42,6 +51,12 @@ export class RequestsController {
   }
 
   @Get()
+  @ApiOperation({ summary: 'Daftar permintaan', description: 'CREATOR: hanya permintaan sendiri. APPROVER: semua permintaan. Bisa filter status dan paginasi.' })
+  @ApiQuery({ name: 'page', required: false, description: 'Halaman' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Limit per halaman' })
+  @ApiQuery({ name: 'status', required: false, enum: ['PENDING', 'APPROVED', 'REJECTED'] })
+  @ApiResponse({ status: 200, description: 'Daftar permintaan (items, total, page, limit).' })
+  @ApiResponse({ status: 401, description: 'Token tidak valid.' })
   async findMany(
     @Req() req: Request & { user: JwtUser },
     @Query() query: ListRequestsQueryDto,
@@ -57,6 +72,12 @@ export class RequestsController {
   }
 
   @Get(':id')
+  @ApiOperation({ summary: 'Detail permintaan', description: 'CREATOR: hanya permintaan sendiri. APPROVER: semua permintaan.' })
+  @ApiParam({ name: 'id', description: 'UUID permintaan' })
+  @ApiResponse({ status: 200, description: 'Detail permintaan beserta data creator.' })
+  @ApiResponse({ status: 401, description: 'Token tidak valid.' })
+  @ApiResponse({ status: 403, description: 'CREATOR mengakses permintaan orang lain.' })
+  @ApiResponse({ status: 404, description: 'Permintaan tidak ditemukan.' })
   async findOne(
     @Req() req: Request & { user: JwtUser },
     @Param('id') id: string,
@@ -67,6 +88,14 @@ export class RequestsController {
   @Patch(':id')
   @UseGuards(RolesGuard)
   @Roles(['CREATOR'])
+  @ApiOperation({ summary: 'Ubah permintaan', description: 'Hanya CREATOR pemilik permintaan. Hanya permintaan dengan status PENDING yang bisa diubah.' })
+  @ApiParam({ name: 'id', description: 'UUID permintaan' })
+  @ApiBody({ type: UpdateRequestDto })
+  @ApiResponse({ status: 200, description: 'Permintaan berhasil diubah.' })
+  @ApiResponse({ status: 400, description: 'Permintaan sudah diputus (bukan PENDING) atau validasi gagal.' })
+  @ApiResponse({ status: 401, description: 'Token tidak valid.' })
+  @ApiResponse({ status: 403, description: 'Bukan pemilik atau bukan role CREATOR.' })
+  @ApiResponse({ status: 404, description: 'Permintaan tidak ditemukan.' })
   async update(
     @Req() req: Request & { user: JwtUser },
     @Param('id') id: string,

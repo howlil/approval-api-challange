@@ -1,0 +1,352 @@
+openapi: 3.0.0
+paths:
+  /api/v1/users:
+    post:
+      description: Mendaftarkan pengguna baru (CREATOR atau APPROVER). Email harus unik.
+      operationId: UsersController_register
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserDto'
+      responses:
+        '201':
+          description: Pengguna berhasil dibuat. Data pengguna dikembalikan tanpa kata sandi.
+        '400':
+          description: Validasi gagal (email/password/role tidak valid).
+        '409':
+          description: Email sudah terdaftar.
+      summary: Registrasi
+      tags:
+        - Pengguna
+  /api/v1/users/me:
+    get:
+      description: Mengambil data pengguna yang sedang login (memerlukan token JWT).
+      operationId: UsersController_me
+      parameters: []
+      responses:
+        '200':
+          description: Data pengguna (id, email, name, role).
+        '401':
+          description: Token tidak ada atau tidak valid.
+      security:
+        - JWT: []
+      summary: Profil saya
+      tags:
+        - Pengguna
+  /api/v1/auth/login:
+    post:
+      description: Masuk dengan email dan kata sandi. Mengembalikan token JWT untuk dipakai di header Authorization.
+      operationId: AuthController_login
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginDto'
+      responses:
+        '200':
+          description: Berhasil. Response berisi access_token.
+        '400':
+          description: Validasi gagal (email/kata sandi tidak valid).
+        '401':
+          description: Email atau kata sandi salah.
+      summary: Login
+      tags:
+        - Autentikasi
+  /api/v1/requests:
+    post:
+      description: Hanya role CREATOR. Membuat permintaan baru dengan status PENDING.
+      operationId: RequestsController_create
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRequestDto'
+      responses:
+        '201':
+          description: Permintaan berhasil dibuat.
+        '400':
+          description: Validasi gagal (judul kosong, dll).
+        '401':
+          description: Token tidak valid.
+        '403':
+          description: Hanya CREATOR yang boleh membuat permintaan.
+      security:
+        - JWT: []
+      summary: Buat permintaan
+      tags:
+        - Permintaan
+    get:
+      description: 'CREATOR: hanya permintaan sendiri. APPROVER: semua permintaan. Bisa filter status dan paginasi.'
+      operationId: RequestsController_findMany
+      parameters:
+        - name: page
+          required: false
+          in: query
+          description: Halaman
+          schema:
+            default: 1
+            example: 1
+            type: number
+        - name: limit
+          required: false
+          in: query
+          description: Limit per halaman
+          schema:
+            default: 10
+            example: 10
+            type: number
+        - name: status
+          required: false
+          in: query
+          description: Filter berdasarkan status permintaan
+          schema:
+            enum:
+              - PENDING
+              - APPROVED
+              - REJECTED
+            type: string
+      responses:
+        '200':
+          description: Daftar permintaan (items, total, page, limit).
+        '401':
+          description: Token tidak valid.
+      security:
+        - JWT: []
+      summary: Daftar permintaan
+      tags:
+        - Permintaan
+  /api/v1/requests/{id}:
+    get:
+      description: 'CREATOR: hanya permintaan sendiri. APPROVER: semua permintaan.'
+      operationId: RequestsController_findOne
+      parameters:
+        - name: id
+          required: true
+          in: path
+          description: UUID permintaan
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Detail permintaan beserta data creator.
+        '401':
+          description: Token tidak valid.
+        '403':
+          description: CREATOR mengakses permintaan orang lain.
+        '404':
+          description: Permintaan tidak ditemukan.
+      security:
+        - JWT: []
+      summary: Detail permintaan
+      tags:
+        - Permintaan
+    patch:
+      description: Hanya CREATOR pemilik permintaan. Hanya permintaan dengan status PENDING yang bisa diubah.
+      operationId: RequestsController_update
+      parameters:
+        - name: id
+          required: true
+          in: path
+          description: UUID permintaan
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRequestDto'
+      responses:
+        '200':
+          description: Permintaan berhasil diubah.
+        '400':
+          description: Permintaan sudah diputus (bukan PENDING) atau validasi gagal.
+        '401':
+          description: Token tidak valid.
+        '403':
+          description: Bukan pemilik atau bukan role CREATOR.
+        '404':
+          description: Permintaan tidak ditemukan.
+      security:
+        - JWT: []
+      summary: Ubah permintaan
+      tags:
+        - Permintaan
+  /api/v1/requests/{id}/decide:
+    post:
+      description: >-
+        Hanya APPROVER. Menyetujui atau menolak permintaan. Tidak boleh memutus permintaan sendiri. Permintaan harus
+        status PENDING.
+      operationId: ApprovalsController_decide
+      parameters:
+        - name: id
+          required: true
+          in: path
+          description: UUID permintaan
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DecideApprovalDto'
+      responses:
+        '201':
+          description: Keputusan berhasil disimpan. Status permintaan berubah (APPROVED/REJECTED).
+        '400':
+          description: Permintaan sudah diputus atau validasi gagal.
+        '401':
+          description: Token tidak valid.
+        '403':
+          description: Bukan APPROVER, atau approver memutus permintaan sendiri.
+        '404':
+          description: Permintaan tidak ditemukan.
+        '409':
+          description: Approver sudah pernah memutus permintaan ini.
+      security:
+        - JWT: []
+      summary: Putuskan permintaan
+      tags:
+        - Persetujuan
+  /api/v1/requests/{id}/approvals:
+    get:
+      description: >-
+        Daftar keputusan (approve/reject) untuk suatu permintaan. CREATOR hanya untuk permintaan sendiri; APPROVER untuk
+        semua.
+      operationId: ApprovalsController_findHistory
+      parameters:
+        - name: id
+          required: true
+          in: path
+          description: UUID permintaan
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Daftar riwayat persetujuan (approver, decision, note, approvedAt).
+        '401':
+          description: Token tidak valid.
+        '403':
+          description: CREATOR mengakses permintaan orang lain.
+        '404':
+          description: Permintaan tidak ditemukan.
+      security:
+        - JWT: []
+      summary: Riwayat persetujuan
+      tags:
+        - Persetujuan
+info:
+  title: API Dot-ID
+  description: >-
+    Dokumentasi API untuk aplikasi manajemen permintaan (request) dan persetujuan (approval). Semua response mengikuti
+    format: `{ data, success, message }`. Endpoint yang memerlukan autentikasi menggunakan Bearer JWT.
+  version: '1.0'
+  contact: {}
+tags:
+  - name: Autentikasi
+    description: Login dan token JWT
+  - name: Pengguna
+    description: Registrasi dan profil pengguna
+  - name: Permintaan
+    description: CRUD permintaan (hanya CREATOR bisa buat/ubah)
+  - name: Persetujuan
+    description: Keputusan approve/reject dan riwayat (role APPROVER)
+servers:
+  - url: http://localhost:3000
+    description: Server lokal (development)
+components:
+  securitySchemes:
+    JWT:
+      scheme: bearer
+      bearerFormat: JWT
+      type: http
+      description: Token JWT dari endpoint login
+  schemas:
+    CreateUserDto:
+      type: object
+      properties:
+        email:
+          type: string
+          example: user@contoh.id
+          description: Alamat email (unik)
+        name:
+          type: string
+          example: Nama Pengguna
+          description: Nama tampilan (opsional)
+        password:
+          type: string
+          example: password123
+          description: Kata sandi (min. 8 karakter)
+          minLength: 8
+        role:
+          type: string
+          enum:
+            - CREATOR
+            - APPROVER
+          description: 'Role: CREATOR (buat/ubah permintaan) atau APPROVER (approve/reject)'
+      required:
+        - email
+        - password
+        - role
+    LoginDto:
+      type: object
+      properties:
+        email:
+          type: string
+          example: creator@dot-id.local
+          description: Alamat email pengguna
+        password:
+          type: string
+          example: creator123
+          description: Kata sandi
+          minLength: 1
+      required:
+        - email
+        - password
+    CreateRequestDto:
+      type: object
+      properties:
+        title:
+          type: string
+          example: Permintaan akses sistem X
+          description: Judul permintaan (wajib)
+        description:
+          type: string
+          example: Detail penjelasan permintaan.
+          description: Deskripsi (opsional)
+      required:
+        - title
+    UpdateRequestDto:
+      type: object
+      properties:
+        title:
+          type: string
+          example: Judul permintaan (diubah)
+          description: Judul baru (opsional)
+        description:
+          type: string
+          example: Deskripsi baru
+          description: Deskripsi baru (opsional)
+    DecideApprovalDto:
+      type: object
+      properties:
+        decision:
+          type: string
+          enum:
+            - APPROVED
+            - REJECTED
+          description: 'Keputusan: setujui atau tolak permintaan'
+        note:
+          type: string
+          example: Disetujui sesuai kebijakan.
+          description: Catatan dari approver (opsional)
+      required:
+        - decision
